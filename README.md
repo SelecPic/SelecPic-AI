@@ -1,7 +1,7 @@
 # SelecPic-AI
 
-SelecPic의 AI 추론 서버다. Spring 백엔드에서 메시지 큐를 통해 작업을 받아
-얼굴 감지 → 정렬 → 임베딩 → 클러스터링 파이프라인을 실행하고 결과를 반환한다.
+SelecPic의 AI 추론 서버다. Spring 백엔드가 RabbitMQ에 발행한 작업을 consumer로 받아
+얼굴 감지 → 정렬 → 임베딩 → 클러스터링 파이프라인을 실행하고 결과를 결과 큐에 발행한다.
 
 자세한 파이프라인 설계는 [docs/architecture/pipeline-overview.md](docs/architecture/pipeline-overview.md) 참고.
 

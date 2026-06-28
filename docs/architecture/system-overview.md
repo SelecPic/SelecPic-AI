@@ -15,7 +15,7 @@ Spring API Server ─────────── PostgreSQL (메타데이터)
 AWS S3 (원본 이미지 저장)             │
   │                                 │
   ▼                                 │
-Message Queue (Kafka / Redis) ───────┘
+Message Queue (RabbitMQ) ─────────────┘
   │
   ▼
 [이 서버] SelecPic-AI (FastAPI)
@@ -31,18 +31,20 @@ Message Queue (Kafka / Redis) ───────┘
 
 ## Spring 백엔드와의 연동
 
-Spring 백엔드는 `AiClassificationPort` → `FastApiAdapter`를 통해 이 서버를
-호출한다. 이 서버는 두 가지 방식으로 작업을 받는다.
+Spring 백엔드와 이 서버는 **RabbitMQ 메시지 큐로만** 연동한다(비동기 단일 경로).
 
-- **메시지 큐(Kafka/Redis)**: 비동기 대량 처리 (주요 경로)
-- **REST API 직접 호출**: 동기 처리가 필요한 경우
+- Spring이 **요청 큐**에 분류 작업 메시지를 발행한다(producer).
+- 이 서버가 **consumer**로 메시지를 소비해 파이프라인을 실행한다.
+- 완료 후 **결과 큐**에 분류 결과를 발행하고, Spring이 이를 구독한다.
+
+HTTP 엔드포인트는 운영용 헬스 체크(`/health`)에만 사용하며, 분류 요청은 받지 않는다.
 
 ## 데이터 흐름
 
-1. Spring이 S3에 원본 이미지를 업로드하고 Presigned URL 또는 S3 경로를 메시지 큐에 발행한다.
-2. 이 서버가 메시지를 수신해 AI 파이프라인을 실행한다.
-3. 파이프라인 완료 후 클러스터 결과(인물 ID → 이미지 목록 매핑)를 Spring에 반환한다.
-4. 생성된 임베딩 벡터는 pgvector에 저장해 향후 증분 분류에 재사용한다.
+1. Spring이 S3에 원본 이미지를 업로드하고 S3 경로(또는 Presigned URL)를 RabbitMQ 요청 큐에 발행한다.
+2. 이 서버의 consumer가 메시지를 수신해 AI 파이프라인을 실행한다.
+3. 파이프라인 완료 후 클러스터 결과(인물 클러스터 → 이미지 목록 매핑)를 RabbitMQ 결과 큐에 발행한다.
+4. 클러스터별 대표벡터를 pgvector에 저장·갱신해 향후 증분 분류에 재사용한다.
 
 ## AI 서버의 역할 범위
 
